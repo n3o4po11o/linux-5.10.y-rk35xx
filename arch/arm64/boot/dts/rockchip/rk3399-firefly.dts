@@ -11,6 +11,9 @@
 #include "rk3399-opp.dtsi"
 #include "rk3399-linux.dtsi"
 #include <dt-bindings/input/input.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/usb/pd.h>
+#include <dt-bindings/pinctrl/rockchip.h>
 
 / {
 	model = "Rockchip RK3399 Firefly Board (Linux Opensource)";
@@ -682,13 +685,46 @@
 	i2c-scl-falling-time-ns = <20>;
 
 	fusb0: fusb30x@22 {
-		compatible = "fairchild,fusb302";
+		compatible = "fcs,fusb302";
 		reg = <0x22>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&fusb0_int>;
-		int-n-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-		vbus-5v-gpios = <&gpio2 0 GPIO_ACTIVE_HIGH>;
+		fcs,int_n-gpios = <&gpio1 RK_PA2 GPIO_ACTIVE_LOW>;
+		vbus-supply = <&vcc5v0_host>;
+		sel-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_HIGH>;
 		status = "okay";
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			port@0 {
+				reg = <0>;
+				fusb_to_phy: endpoint {
+					remote-endpoint = <&u2phy0_typec_hs>;
+				};
+			};
+		};
+		connector {
+			compatible = "usb-c-connector";
+			label = "USB-C";
+			data-role = "dual"; 
+            power-role = "dual";
+            try-power-role = "sink";
+            typec-role = "dual-role";
+
+            /* 必须：提供 PDO 列表，显式指定为 32 位整型数组 */
+            source-pdos = /bits/ 32 <PDO_FIXED(5000, 500, PDO_FIXED_DUAL_ROLE | PDO_FIXED_USB_COMM | PDO_FIXED_DATA_SWAP)>;
+            sink-pdos = /bits/ 32 <PDO_FIXED(5000, 500, PDO_FIXED_DUAL_ROLE | PDO_FIXED_USB_COMM | PDO_FIXED_DATA_SWAP)>;
+			op-sink-microwatt = <2500000>;
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				port {
+				connector_to_phy: endpoint {
+					remote-endpoint = <&u2phy0_typec_hs>;
+				};
+			};
+            };
+		};
 	};
 
 	gsl3680: gsl3680@41 {
@@ -945,9 +981,17 @@
 &u2phy0 {
 	status = "okay";
 	extcon = <&fusb0>;
+	interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH 0>;
 
 	u2phy0_otg: otg-port {
 		status = "okay";
+		port {
+			u2phy0_typec_hs: endpoint {
+				/* 关键点：PHY 同时指向上面两个 endpoint */
+				/* 但在 DTS 规范中，通常指向 connector 层级更优先 */
+				remote-endpoint = <&connector_to_phy>;
+			};
+		};
 	};
 
 	u2phy0_host: host-port {
@@ -991,6 +1035,8 @@
 	status = "okay";
 	extcon = <&fusb0>;
 	dr_mode = "peripheral";
+	usb-role-switch;
+	role-switch-default-mode = "peripheral";
 };
 
 &usbdrd_dwc3_1 {
