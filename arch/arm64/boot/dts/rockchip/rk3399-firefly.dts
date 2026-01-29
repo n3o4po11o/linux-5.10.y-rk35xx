@@ -963,7 +963,12 @@
 
 &tcphy0 {
 	extcon = <&fusb0>;
+	power-domains = <&power RK3399_PD_TCPD0>;
 	status = "okay";
+};
+
+&tcphy0_usb3 {
+    status = "okay";
 };
 
 &tcphy1 {
@@ -976,6 +981,12 @@
 	/* tshut polarity 0:LOW 1:HIGH */
 	rockchip,hw-tshut-polarity = <1>;
 	status = "okay";
+};
+
+&u2phy0_otg {
+    status = "okay";
+    /* 强制绕过 extcon 检测逻辑，直接上电 */
+    rockchip,vbus-always-on; 
 };
 
 &u2phy0 {
@@ -1002,6 +1013,7 @@
 
 &u2phy1 {
 	status = "okay";
+	interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH 0>;
 
 	u2phy1_otg: otg-port {
 		status = "okay";
@@ -1025,6 +1037,7 @@
 
 &usbdrd3_0 {
 	status = "okay";
+	power-domains = <&power RK3399_PD_USB3>;
 };
 
 &usbdrd3_1 {
@@ -1037,6 +1050,8 @@
 	dr_mode = "peripheral";
 	usb-role-switch;
 	role-switch-default-mode = "peripheral";
+	phys = <&u2phy0_otg>, <&tcphy0_usb3>;
+    phy-names = "usb2-phy", "usb3-phy";
 };
 
 &usbdrd_dwc3_1 {
